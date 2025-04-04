@@ -1,5 +1,6 @@
 import com.android.build.api.variant.ResValue
 import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
+import java.io.File
 
 plugins {
 	autowire(libs.plugins.android.application)
@@ -8,21 +9,44 @@ plugins {
 	autowire(libs.plugins.android.x.room)
 }
 
+val localProps = gradleLocalProperties(rootDir, providers)
+
+fun getOptionalProperty(key: String): String? {
+    return if (localProps.contains(key)) localProps.getProperty(key) else null
+}
+
 android {
 	signingConfigs {
 		getByName("debug") {
-			storeFile = file(gradleLocalProperties(rootDir, providers).getProperty("keystore.location"))
-			storePassword = gradleLocalProperties(rootDir, providers).getProperty("keystore.password")
-			keyPassword = gradleLocalProperties(rootDir, providers).getProperty("keystore.password")
-			keyAlias = gradleLocalProperties(rootDir, providers).getProperty("keystore.alias")
-		}
-		create("release") {
-			storeFile = file(gradleLocalProperties(rootDir, providers).getProperty("keystore.location"))
-			storePassword = gradleLocalProperties(rootDir, providers).getProperty("keystore.password")
-			keyPassword = gradleLocalProperties(rootDir, providers).getProperty("keystore.keypass")
-			keyAlias = gradleLocalProperties(rootDir, providers).getProperty("keystore.alias")
+            val storeFilePath = getOptionalProperty("keystore.location")
+            val storePass = getOptionalProperty("keystore.password")
+            val keyAliasValue = getOptionalProperty("keystore.alias")
 
-		}
+            if (storeFilePath != null && storePass != null && keyAliasValue != null) {
+                storeFile = File(storeFilePath)
+                storePassword = storePass
+                keyAlias = keyAliasValue
+                keyPassword = storePass
+            } else {
+                println("Debug keystore not fully configured; skipping signing config.")
+            }
+        }
+
+        create("release") {
+            val storeFilePath = getOptionalProperty("keystore.location")
+            val storePass = getOptionalProperty("keystore.password")
+            val keyAliasValue = getOptionalProperty("keystore.alias")
+            val keyPass = getOptionalProperty("keystore.keypass")
+
+            if (storeFilePath != null && storePass != null && keyAliasValue != null && keyPass != null) {
+                storeFile = File(storeFilePath)
+                storePassword = storePass
+                keyAlias = keyAliasValue
+                keyPassword = keyPass
+            } else {
+                println("Release keystore not fully configured; skipping signing config.")
+            }
+        }
 	}
 	namespace = property.project.app.packageName
 	compileSdk = 35
